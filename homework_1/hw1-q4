@@ -1,0 +1,133 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 61,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "Dict{Symbol,Int64} with 5 entries:\n",
+       "  :c   => 3000\n",
+       "  :a   => 1000\n",
+       "  :b   => 2000\n",
+       "  :d   => 3000\n",
+       "  :def => 0"
+      ]
+     },
+     "execution_count": 61,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "#-----Data-----#\n",
+    "\n",
+    "#Manufacturing methods\n",
+    "method = [:m1, :m2]\n",
+    "#Germanium grades\n",
+    "grade = [:a, :b, :c, :d, :def]\n",
+    "#Cost per transistor of the two methods and refiring in dollars\n",
+    "cost = Dict(:m1 => 50, :m2 => 70)\n",
+    "refCost = 25\n",
+    "\n",
+    "#Grade yields of the two methods in percentage\n",
+    "yield = Dict(\n",
+    ":m1 => Dict(:a => 0.05, :b => 0.15, :c => 0.2, :d => 0.3, :def => 0.3),\n",
+    ":m2 => Dict(:a => 0.15, :b => 0.20, :c => 0.25, :d => 0.2, :def => 0.2)   )\n",
+    "\n",
+    "#Grade yields of the refiring process\n",
+    "yieldR = Dict(\n",
+    ":a => Dict(:a => 0.0, :b => 0.0, :c => 0.0, :d => 0.0, :def => 0.0),\n",
+    ":b => Dict(:a => 0.5, :b => 0.5, :c => 0.0, :d => 0.0, :def => 0.0),\n",
+    ":c => Dict(:a => 0.3, :b => 0.3, :c => 0.4, :d => 0.0, :def => 0.0),         \n",
+    ":d => Dict(:a => 0.2, :b => 0.2, :c => 0.3, :d => 0.3, :def => 0.0),\n",
+    ":def => Dict(:a => 0.1, :b => 0.2, :c => 0.15, :d => 0.25, :def => 0.3),    )\n",
+    "\n",
+    "#Per month furnace capacity\n",
+    "capacity = 20000\n",
+    "#Demand for each grade of transistor\n",
+    "demand = Dict(:a => 1000, :b => 2000, :c => 3000, :d => 3000, :def => 0)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 60,
+   "metadata": {
+    "collapsed": false
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Minimum cost required: 641725.352112676 dollars\n"
+     ]
+    }
+   ],
+   "source": [
+    "# -----Model-----#\n",
+    "\n",
+    "using JuMP\n",
+    "m= Model()\n",
+    "\n",
+    "#Method output\n",
+    "@defVar(m, q[method] >= 0)   \n",
+    "#Refiring input\n",
+    "@defVar(m, r[grade] >= 0)  \n",
+    "\n",
+    "\n",
+    "#Method grade output\n",
+    "@defExpr(m1Out[g in grade], q[:m1]*(yield[:m1])[g])\n",
+    "@defExpr(m2Out[g in grade], q[:m2]*(yield[:m2])[g])\n",
+    "#Refiring grade output\n",
+    "@defExpr(rOut[g in grade], sum{r[h]*yieldR[h][g], h in grade} )\n",
+    "#Total transistors produced of each grade\n",
+    "@defExpr(finalOut[g in grade], m1Out[g] + m2Out[g] + rOut[g] - r[g])\n",
+    "#Total cost\n",
+    "@defExpr(totalCost, sum{q[m]*cost[m], m in method} + sum{r[g], g in grade}*refCost)\n",
+    "\n",
+    "#Constraints\n",
+    "#Input into refiring is no more than output of method 1, 2\n",
+    "@addConstraint(m, rIn[g in grade], r[g] <= m1Out[g] + m2Out[g])\n",
+    "#Furnace capacity constraint\n",
+    "@addConstraint(m, sum{q[m], m in method} + sum{r[g], g in grade} <= capacity)\n",
+    "#Demand fulfillment\n",
+    "@addConstraint(m, meetDem[g in grade], finalOut[g] >= demand[g])\n",
+    "\n",
+    "#Minimize cost\n",
+    "@setObjective(m, Min, totalCost)\n",
+    "\n",
+    "solve(m)\n",
+    "println(\"Minimum cost required: \", getValue(totalCost), \" dollars\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Julia 0.4.3",
+   "language": "julia",
+   "name": "julia-0.4"
+  },
+  "language_info": {
+   "file_extension": ".jl",
+   "mimetype": "application/julia",
+   "name": "julia",
+   "version": "0.4.3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 0
+}
